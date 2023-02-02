@@ -9,7 +9,7 @@ import android.util.Log
 class MwaWalletLibModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
     override fun getName() = "MwaWalletLibModule"
 
-    @ReactMethod fun test(name: String) {
+    @ReactMethod fun tryTest(name: String) {
         Log.d("MwaWalletLibModule", "Testing: $name");
     }
 }
