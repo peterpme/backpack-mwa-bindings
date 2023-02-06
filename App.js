@@ -7,16 +7,20 @@ import {
   NativeModules,
   Button,
   Linking,
+  NativeEventEmitter,
+  Platform,
+  BackHandler,
 } from "react-native";
 
-console.log("authorize?", NativeModules.MwaWalletLibModule.authorizeDapp);
+const publicKey = "11111111111111111111111111111111";
 
 export default function App() {
+  const [event, setEvent] = React.useState(null);
+  // fires if app is open
+  // solana-wallet://xyz-whatever-comes
   React.useEffect(() => {
-    // fires if app is open
     Linking.addEventListener("url", (event) => {
-      console.log("1addEventListener:event", event);
-      console.log("1addEventListener:url", event.url);
+      const { url } = event;
       if (url && url.includes("solana-wallet")) {
         initiateWalletScenario(url);
       }
@@ -27,11 +31,10 @@ export default function App() {
     };
   }, []);
 
+  // fires if app is closed
   React.useEffect(() => {
     async function f() {
-      // fires if app is closed
       const url = await Linking.getInitialURL();
-      console.log("2getInitialURL:url", url);
       if (url && url.includes("solana-wallet")) {
         initiateWalletScenario(url);
       }
@@ -40,71 +43,181 @@ export default function App() {
     f();
   }, []);
 
+  React.useEffect(() => {
+    const eventEmitter = new NativeEventEmitter(
+      NativeModules.MwaWalletLibModule
+    );
+
+    eventEmitter.addListener("MWA_EVENT", handleNativeEvent);
+
+    return () => {
+      // eventEmitter.removeListeners();
+    };
+  }, []);
+
   function initiateWalletScenario(intent /* string */) {
     NativeModules.MwaWalletLibModule.createScenario(
-      "Backpack", // this'll always be Backpack
+      "Backpack", // wallet name
       intent,
-      (event, data) => {
+      (event, errorMsg) => {
         switch (event) {
-          case "SCENARIO_READY":
-            console.log("SCENARIO_READY");
-            break;
-          case "SCENARIO_COMPLETE":
-            console.log("SCENARIO_COMPLETE", data);
-            break;
-          case "SCENARIO_ERROR":
-            console.log("SCENARIO_ERROR", data);
-            break;
-          case "SCENARIO_TEARDOWN_COMPLETE":
-            console.log("SCENARIO_TEARDOWN_COMPLETE", data);
-            break;
-          case "AUTHORIZE_REQUEST":
-            // show the bottom sheet modal
-            console.log("AUTHORIZE_REQUEST");
-            break;
-          case "RE_AUTHORIZE_REQUEST":
-            console.log("RE_AUTHORIZE_REQUEST", data);
-            break;
-          case "SIGN_TRANSACTION_REQUEST":
-            console.log("SIGN_TRANSACTION_REQUEST", data);
-            break;
-          case "SIGN_MESSAGE_REQUEST":
-            console.log("SIGN_MESSAGE_REQUEST", data);
-            break;
-          case "SIGN_AND_SEND_TRANSACTION_REQUEST":
-            console.log("SIGN_AND_SEND_TRANSACTION_REQUEST", data);
-            break;
-          case "DE_AUTHORIZE_EVENT":
-            console.log("DE_AUTHORIZE_EVENT", data);
-            break;
+          case "ERROR":
+            console.error("ERROR", errorMsg);
           default:
-            console.log("error");
+            console.log("SUCCESS");
         }
       }
     );
   }
 
-  // console.log("authorizeRequest", authorizeRequest);
+  function handleNativeEvent(event) {
+    setEvent(event.type);
+    switch (event.type) {
+      case "ON_SCENARIO_READY":
+        console.log("SCENARIO_READY");
+        break;
+      case "SCENARIO_COMPLETE":
+        console.log("SCENARIO_COMPLETE");
+        break;
+      case "SCENARIO_ERROR":
+        console.log("SCENARIO_ERROR");
+        break;
+      case "SCENARIO_TEARDOWN_COMPLETE":
+        console.log("SCENARIO_TEARDOWN_COMPLETE");
+        break;
+      case "AUTHORIZE_REQUEST":
+        console.log("AUTHORIZE_REQUEST");
+        break;
+      case "RE_AUTHORIZE_REQUEST":
+        console.log("RE_AUTHORIZE_REQUEST");
+        break;
+      case "SIGN_TRANSACTION_REQUEST":
+        console.log("SIGN_TRANSACTION_REQUEST");
+        break;
+      case "SIGN_MESSAGE_REQUEST":
+        console.log("SIGN_MESSAGE_REQUEST");
+        break;
+      case "SIGN_AND_SEND_TRANSACTION_REQUEST":
+        console.log("SIGN_AND_SEND_TRANSACTION_REQUEST");
+        break;
+      case "DE_AUTHORIZE_EVENT":
+        console.log("DE_AUTHORIZE_EVENT");
+        break;
+      case "SCENARIO_SERVING_CLIENTS":
+        console.log("SCENARIO_SERVING_CLIENTS");
+        break;
+      default:
+        console.log("UNKNOWN_EVENT", event);
+    }
+  }
 
-  function authorize(authorized) {
-    console.log("authorized", authorized);
+  function ReAuthorizeView() {
+    // Shouldn't need to show any buttons here or anything, but doing it for the sake of visually confirming differences
     try {
-      NativeModules.MwaWalletLibModule.authorizeDapp("xyz", authorized);
+      NativeModules.MwaWalletLibModule.reauthorizeDapp();
     } catch (err) {
       console.error("authorized:err", err);
+    }
+
+    return (
+      <View style={styles.modal}>
+        <Button title="Re-Authorize" onPress={() => handlePress(true)} />
+      </View>
+    );
+  }
+
+  function AuthorizeView() {
+    function handlePress(authorized) {
+      try {
+        NativeModules.MwaWalletLibModule.authorizeDapp(publicKey, authorized);
+        // if (Platform.OS === "android") {
+        //   BackHandler.exitApp(); // closes the view and returns to the app
+        // }
+      } catch (err) {
+        console.error("authorized:err", err);
+      }
+    }
+
+    return (
+      <View style={styles.modal}>
+        <Button title="Authorize" onPress={() => handlePress(true)} />
+        <Button title="Deauthorize" onPress={() => handlePress(false)} />
+      </View>
+    );
+  }
+
+  function SignTransactionView() {
+    function handlePress(authorized) {
+      try {
+        NativeModules.MwaWalletLibModule.authorizeDapp(publicKey, authorized);
+        if (Platform.OS === "android") {
+          BackHandler.exitApp(); // closes the view and returns to the app
+        }
+      } catch (err) {
+        console.error("authorized:err", err);
+      }
+    }
+
+    return (
+      <View style={styles.modal}>
+        <Button title="Authorize" onPress={() => handlePress(true)} />
+        <Button title="Deauthorize" onPress={() => handlePress(false)} />
+      </View>
+    );
+  }
+
+  function SignMessageView() {
+    function handlePress(authorized) {
+      try {
+        NativeModules.MwaWalletLibModule.authorizeDapp(publicKey, authorized);
+        if (Platform.OS === "android") {
+          BackHandler.exitApp(); // closes the view and returns to the app
+        }
+      } catch (err) {
+        console.error("authorized:err", err);
+      }
+    }
+
+    return (
+      <View style={styles.modal}>
+        <Button title="Authorize" onPress={() => handlePress(true)} />
+        <Button title="Deauthorize" onPress={() => handlePress(false)} />
+      </View>
+    );
+  }
+
+  function renderViewForEvent(event) {
+    switch (event) {
+      case "AUTHORIZE_REQUEST":
+        return <AuthorizeView />;
+      case "RE_AUTHORIZE_REQUEST":
+        return <ReAuthorizeView />;
+      case "SIGN_TRANSACTION_REQUEST":
+        return <SignTransactionView />;
+      case "SIGN_MESSAGE_REQUEST":
+        return <SignMessageView />;
+      default:
+        return (
+          <View style={styles.container}>
+            <Text>
+              Call a fake dapp function or test the module is hooked up
+              correctly
+            </Text>
+            <Button
+              title="Test"
+              onPress={() =>
+                NativeModules.MwaWalletLibModule.tryTest2("Friend")
+              }
+            />
+          </View>
+        );
     }
   }
 
   return (
     <View style={styles.container}>
-      <Text>Open up App.js to start working on your app!</Text>
       <StatusBar style="auto" />
-      <Button
-        title="Test"
-        onPress={() => NativeModules.MwaWalletLibModule.tryTest2("Friend")}
-      />
-      <Button title="Authorize Request" onPress={() => authorize(true)} />
-      <Button title="Decline Request" onPress={() => authorize(false)} />
+      {renderViewForEvent(event)}
     </View>
   );
 }
@@ -112,8 +225,11 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center",
+    backgroundColor: "transparent",
+    justifyContent: "flex-end",
+  },
+  modal: {
+    height: 100,
+    backgroundColor: "white",
   },
 });

@@ -14,19 +14,59 @@ import com.solana.mobilewalletadapter.walletlib.protocol.MobileWalletAdapterServ
 import com.solana.mobilewalletadapter.walletlib.scenario.*
 import kotlinx.coroutines.Dispatchers
 
+import com.facebook.react.modules.core.DeviceEventManagerModule
+
 // by typing `val` we're holding onto a reference to reactContext
 class MwaWalletLibModule(val reactContext: ReactApplicationContext) :
     ReactContextBaseJavaModule(reactContext) {
     override fun getName() = "MwaWalletLibModule"
+
     private var scenario: Scenario? = null
     var authRequest: AuthorizeRequest? = null
     var reAuthRequest: ReauthorizeRequest? = null
     var stRequest: SignTransactionsRequest? = null
+    var smRequest: SignMessagesRequest? = null
     var spRequest: SignPayloadsRequest? = null
     var signAndSendTransactionsRequest: SignAndSendTransactionsRequest? = null
 
     companion object {
         private val TAG = MwaWalletLibModule::class.simpleName
+    }
+
+    sealed interface MobileWalletAdapterServiceRequest {
+        object None : MobileWalletAdapterServiceRequest
+        sealed class MobileWalletAdapterRemoteRequest(open val request: ScenarioRequest) : MobileWalletAdapterServiceRequest
+        data class SignAndSendTransactions(
+            override val request: SignAndSendTransactionsRequest,
+            val endpointUri: Uri,
+            val signedTransactions: Array<ByteArray>? = null,
+            val signatures: Array<ByteArray>? = null
+        ) : MobileWalletAdapterRemoteRequest(request)
+    }
+
+    private fun sendEvent(reactContext: ReactContext, eventName: String, params: WritableMap?) {
+        reactContext
+            .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+            .emit(eventName, params)
+    }
+
+    private var listenerCount = 0
+
+    @ReactMethod
+    fun addListener(eventName: String) {
+        if (listenerCount == 0) {
+            // Set up any upstream listeners or background tasks as necessary
+        }
+
+        listenerCount += 1
+    }
+
+    @ReactMethod
+    fun removeListeners(count: Int) {
+        listenerCount -= count
+        if (listenerCount == 0) {
+            // Remove upstream listeners, stop unnecessary background tasks
+        }
     }
 
     @ReactMethod
@@ -37,11 +77,18 @@ class MwaWalletLibModule(val reactContext: ReactApplicationContext) :
     @ReactMethod
     fun tryTest2(name: String) {
         Log.d(TAG, "Testing2: $name")
+
+        val params = Arguments.createMap().apply {
+            putString("eventProperty", "someValue")
+        }
+
+        sendEvent(reactContext, "MWA_EVENT", params)
     }
 
     @ReactMethod
     fun authorizeDapp(publicKey: String, authorized: Boolean) {
         Log.d(TAG, "authorizeDapp: $publicKey:$authorized")
+
 
         if (authorized) {
             authRequest?.completeWithAuthorize(
@@ -51,6 +98,7 @@ class MwaWalletLibModule(val reactContext: ReactApplicationContext) :
                 null
 //                authRequest?.sourceVerificationState.authorizationScope.encodeToByteArray()
             )
+
         } else {
             authRequest?.completeWithDecline()
         }
@@ -119,12 +167,11 @@ class MwaWalletLibModule(val reactContext: ReactApplicationContext) :
         signAndSendTransactionsRequest?.completeWithInvalidSignatures(valid)
     }
 
-    @ReactMethod
-    fun signAndSendTransactionsSubmitted() {
-        Log.d(TAG, "Simulating transactions submitted on cluster") // TODO request.cluster
-//        signAndSendTransactionsRequest?.completeWithSignatures(signAndSendTransactionsRequest?.signatures)
-    }
-
+//    @ReactMethod
+//    fun signAndSendTransactionsSubmitted() {
+//        Log.d(TAG, "Simulating transactions submitted on cluster") // TODO request.cluster
+//        signAndSendTransactionsRequest?.completeWithSignatures(signAndSendTransactionsRequest?.signatures!!)
+//    }
 
     @ReactMethod
     fun signAndSendTransactionsNotSubmitted() {
@@ -149,7 +196,7 @@ class MwaWalletLibModule(val reactContext: ReactApplicationContext) :
     @ReactMethod
     fun reauthorizeDapp() {
         Log.d(TAG, "reauthorizeDap");
-        reAuthRequest?.completeWithReauthorize()
+        reAuthRequest?.completeWithReauthorize() // REMEMBER TO SAVE THESE SOMEWHERE!
     }
 
     @ReactMethod
@@ -170,14 +217,12 @@ class MwaWalletLibModule(val reactContext: ReactApplicationContext) :
 
         val associationUri = AssociationUri.parse(uri)
         if (associationUri == null) {
-//            promise.reject("Unsupported association URI") // update to new version
+            callback.invoke("ERROR", "Unsupported association URI")
             return
         } else if (associationUri !is LocalAssociationUri) {
-//            promise.reject("Current implementation of fakewallet does not support remote clients")
+            callback.invoke("ERROR", "Current implementation of fakewallet does not support remote clients")
             return
         }
-
-        val callbacks = createMobileWalletAdapterScenarioCallbacks(callback)
 
         // created a scenario, told it to start (kicks off some threads in the background)
         // we've kept a reference to it in the global state of this module (scenario)
@@ -191,84 +236,140 @@ class MwaWalletLibModule(val reactContext: ReactApplicationContext) :
                 arrayOf(MobileWalletAdapterConfig.LEGACY_TRANSACTION_VERSION, 0)
             ),
             AuthIssuerConfig(walletName),
-            callbacks
+            createMobileWalletAdapterScenarioCallbacks()
         ).also { it.start() }
 
-//        promise.resolve(true)
+        callback.invoke("SUCCESS")
     }
 
-    private fun createMobileWalletAdapterScenarioCallbacks(
-        callback: Callback
-    ): Scenario.Callbacks {
+    private fun createMobileWalletAdapterScenarioCallbacks(): Scenario.Callbacks {
         return object : Scenario.Callbacks {
             // done
             override fun onScenarioReady() {
                 Log.d(TAG, "onScenarioReady")
-//                callback.invoke("SCENARIO_READY")
+
+                val params = Arguments.createMap().apply {
+                    putString("type", "ON_SCENARIO_READY")
+                }
+
+                sendEvent(reactContext, "MWA_EVENT", params)
             }
 
             // done
             override fun onScenarioServingClients() {
                 Log.d(TAG, "onScenarioServingClients")
-//                callback.invoke("SCENARIO_SERVING_CLIENTS")
+                val params = Arguments.createMap().apply {
+                    putString("type", "SCENARIO_SERVING_CLIENTS")
+                }
+
+                sendEvent(reactContext, "MWA_EVENT", params)
             }
 
             // done (TBD on scenario?.close)
             override fun onScenarioServingComplete() {
                 Log.d(TAG, "onScenarioServingComplete")
+
                 scenario?.close(); // returns (effectively) immediately, it doesn't take very long to run
-//                callback.invoke("SERVING_COMPLETE")
+                val params = Arguments.createMap().apply {
+                    putString("type", "SERVING_COMPLETE")
+                }
+
+                sendEvent(reactContext, "MWA_EVENT", params)
             }
 
             // done
             override fun onScenarioComplete() {
                 Log.d(TAG, "onScenarioComplete")
-//                callback.invoke("SCENARIO_COMPLETE")
+                val params = Arguments.createMap().apply {
+                    putString("type", "SCENARIO_COMPLETE")
+                }
+
+                sendEvent(reactContext, "MWA_EVENT", params)
             }
 
             // done
             override fun onScenarioError() {
                 Log.e(TAG, "onScenarioError")
-//                callback.invoke("SCENARIO_ERROR")
+                val params = Arguments.createMap().apply {
+                    putString("type", "SCENARIO_ERROR")
+                }
+
+                sendEvent(reactContext, "MWA_EVENT", params)
             }
 
             // done (slightly different on native side but that's bc of viewModelScope)
             override fun onScenarioTeardownComplete() {
                 Log.d(TAG, "onScenarioTeardownComplete")
+                val params = Arguments.createMap().apply {
+                    putString("type", "SCENARIO_TEARDOWN_COMPLETE")
+                }
 
-//                callback.invoke("SCENARIO_TEARDOWN_COMPLETE")
+                sendEvent(reactContext, "MWA_EVENT", params)
             }
 
 
             override fun onAuthorizeRequest(request: AuthorizeRequest) {
                 Log.d(TAG, "onAuthorizeRequest")
                 authRequest = request
-                callback.invoke("AUTHORIZE_REQUEST")
+
+                val params = Arguments.createMap().apply {
+                    putString("type", "AUTHORIZE_REQUEST")
+                }
+
+                sendEvent(reactContext, "MWA_EVENT", params)
             }
 
             override fun onReauthorizeRequest(request: ReauthorizeRequest) {
                 Log.d(TAG, "onReauthorizeRequest")
-//                callback.invoke("RE_AUTHORIZE_REQUEST", request)
+                reAuthRequest = request
+                val params = Arguments.createMap().apply {
+                    putString("type", "RE_AUTHORIZE_REQUEST")
+                }
+
+                sendEvent(reactContext, "MWA_EVENT", params)
             }
 
             override fun onSignTransactionsRequest(request: SignTransactionsRequest) {
                 Log.d(TAG, "onSignTransactionsRequest")
-//                callback.invoke("SIGN_TRANSACTION_REQUEST", request)
+                stRequest = request
+                val params = Arguments.createMap().apply {
+                    putString("type", "SIGN_TRANSACTION_REQUEST")
+                }
+
+                sendEvent(reactContext, "MWA_EVENT", params)
             }
+
 
             override fun onSignMessagesRequest(request: SignMessagesRequest) {
                 Log.d(TAG, "onSignMessagesRequest")
-//                callback.invoke("SIGN_MESSAGE_REQUEST", request)
+                var smRequest = request
+                val params = Arguments.createMap().apply {
+                    putString("type", "SIGN_MESSAGE_REQUEST")
+                }
+
+                sendEvent(reactContext, "MWA_EVENT", params)
+                // TODO once the request has been completed, remove the request
+                // NOT HERE! Just remember to do it
             }
+
 
             override fun onSignAndSendTransactionsRequest(request: SignAndSendTransactionsRequest) {
                 Log.d(TAG, "onSignAndSendTransactionsRequest")
-//                callback.invoke("SIGN_AND_SEND_TRANSACTION_REQUEST", request)
+                signAndSendTransactionsRequest = request
+                val params = Arguments.createMap().apply {
+                    putString("type", "SIGN_AND_SEND_TRANSACTION_REQUEST")
+                }
+
+                sendEvent(reactContext, "MWA_EVENT", params)
             }
 
             override fun onDeauthorizedEvent(event: DeauthorizedEvent) {
                 Log.d(TAG, "onDeauthorizedEvent")
-//                callback.invoke("DE_AUTHORIZE_EVENT", event)
+                val params = Arguments.createMap().apply {
+                    putString("type", "DE_AUTHORIZE_EVENT")
+                }
+
+                sendEvent(reactContext, "MWA_EVENT", params)
             }
         }
     }
