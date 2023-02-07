@@ -2,6 +2,8 @@ package com.backpackmwa;
 
 import android.os.Build;
 import android.os.Bundle;
+import android.view.Gravity;
+import android.view.WindowManager;
 
 import com.facebook.react.ReactActivity;
 import com.facebook.react.ReactActivityDelegate;
@@ -15,7 +17,20 @@ public class MainActivity extends ReactActivity {
     // Set the theme to AppTheme BEFORE onCreate to support 
     // coloring the background, status bar, and navigation bar.
     // This is required for expo-splash-screen.
-    setTheme(R.style.AppTheme);
+
+    if (getIntent() != null && getIntent().getData() != null && getIntent().getData().getScheme() != null && getIntent().getData().getScheme().compareTo("solana-wallet") == 0) {
+      setTheme(R.style.Backpack_BottomSheetDialog);
+
+//      WindowManager.LayoutParams windowLayoutParams = getWindow().getAttributes();
+//
+//      windowLayoutParams.gravity = Gravity.BOTTOM;
+//      windowLayoutParams.flags = windowLayoutParams.flags & WindowManager.LayoutParams.FLAG_DIM_BEHIND;
+//
+//      getWindow().setAttributes(windowLayoutParams);
+    } else {
+      setTheme(R.style.AppTheme);
+    }
+
     super.onCreate(null);
   }
 

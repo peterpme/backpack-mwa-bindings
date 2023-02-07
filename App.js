@@ -130,9 +130,6 @@ export default function App() {
     function handlePress(authorized) {
       try {
         NativeModules.MwaWalletLibModule.authorizeDapp(publicKey, authorized);
-        // if (Platform.OS === "android") {
-        //   BackHandler.exitApp(); // closes the view and returns to the app
-        // }
       } catch (err) {
         console.error("authorized:err", err);
       }
@@ -146,13 +143,18 @@ export default function App() {
     );
   }
 
+  function CloseApp() {
+    React.useEffect(() => {
+      if (Platform.OS === "android") {
+        BackHandler.exitApp(); // closes the view and returns to the app
+      }
+    }, []);
+  }
+
   function SignTransactionView() {
     function handlePress(authorized) {
       try {
         NativeModules.MwaWalletLibModule.authorizeDapp(publicKey, authorized);
-        if (Platform.OS === "android") {
-          BackHandler.exitApp(); // closes the view and returns to the app
-        }
       } catch (err) {
         console.error("authorized:err", err);
       }
@@ -170,16 +172,13 @@ export default function App() {
     function handlePress(authorized) {
       try {
         NativeModules.MwaWalletLibModule.authorizeDapp(publicKey, authorized);
-        if (Platform.OS === "android") {
-          BackHandler.exitApp(); // closes the view and returns to the app
-        }
       } catch (err) {
         console.error("authorized:err", err);
       }
     }
 
     return (
-      <View style={styles.modal}>
+      <View style={[styles.modal, { backgroundColor: "green" }]}>
         <Button title="Authorize" onPress={() => handlePress(true)} />
         <Button title="Deauthorize" onPress={() => handlePress(false)} />
       </View>
@@ -196,21 +195,33 @@ export default function App() {
         return <SignTransactionView />;
       case "SIGN_MESSAGE_REQUEST":
         return <SignMessageView />;
+      case "SCENARIO_TEARDOWN_COMPLETE":
+        return <CloseApp />;
       default:
-        return (
-          <View style={styles.container}>
-            <Text>
-              Call a fake dapp function or test the module is hooked up
-              correctly
-            </Text>
-            <Button
-              title="Test"
-              onPress={() =>
-                NativeModules.MwaWalletLibModule.tryTest2("Friend")
-              }
+        if (event == null) {
+          return (
+            <View
+              style={{
+                flex: 1,
+                height: 400,
+                justifyContent: "center",
+                backgroundColor: "yellow",
+              }}
+            >
+              <Text>Hi</Text>
+            </View>
+          );
+        } else {
+          return (
+            <View
+              style={{
+                flex: 1,
+                justifyContent: "center",
+                backgroundColor: "red",
+              }}
             />
-          </View>
-        );
+          );
+        }
     }
   }
 
@@ -223,13 +234,13 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "transparent",
-    justifyContent: "flex-end",
-  },
   modal: {
     height: 100,
-    backgroundColor: "white",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  container: {
+    height: 100,
+    justifyContent: "center",
   },
 });
