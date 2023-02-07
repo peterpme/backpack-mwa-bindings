@@ -10,6 +10,7 @@ import {
   NativeEventEmitter,
   Platform,
   BackHandler,
+  Dimensions,
 } from "react-native";
 
 const publicKey = "11111111111111111111111111111111";
@@ -17,11 +18,11 @@ const publicKey = "11111111111111111111111111111111";
 export default function App() {
   const [event, setEvent] = React.useState(null);
   // fires if app is open
-  // solana-wallet://xyz-whatever-comes
+  // solana-wallet://1/associate/local
   React.useEffect(() => {
     Linking.addEventListener("url", (event) => {
       const { url } = event;
-      if (url && url.includes("solana-wallet")) {
+      if (url && url.startsWith("solana-wallet:/v1/associate/local")) {
         initiateWalletScenario(url);
       }
     });
@@ -31,11 +32,12 @@ export default function App() {
     };
   }, []);
 
-  // fires if app is closed
+  //
+  // // fires if app is closed
   React.useEffect(() => {
     async function f() {
       const url = await Linking.getInitialURL();
-      if (url && url.includes("solana-wallet")) {
+      if (url && url.startsWith("solana-wallet:/v1/associate/local")) {
         initiateWalletScenario(url);
       }
     }
@@ -144,6 +146,7 @@ export default function App() {
   }
 
   function CloseApp() {
+    console.log("hi");
     React.useEffect(() => {
       if (Platform.OS === "android") {
         BackHandler.exitApp(); // closes the view and returns to the app
@@ -185,6 +188,21 @@ export default function App() {
     );
   }
 
+  function NullEventView() {
+    return (
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: "yellow",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Text>Event Is Null!! Normal app experience goes here </Text>
+      </View>
+    );
+  }
+
   function renderViewForEvent(event) {
     switch (event) {
       case "AUTHORIZE_REQUEST":
@@ -199,36 +217,28 @@ export default function App() {
         return <CloseApp />;
       default:
         if (event == null) {
-          return (
-            <View
-              style={{
-                flex: 1,
-                height: 400,
-                justifyContent: "center",
-                backgroundColor: "yellow",
-              }}
-            >
-              <Text>Hi</Text>
-            </View>
-          );
+          return <NullEventView />;
         } else {
-          return (
-            <View
-              style={{
-                flex: 1,
-                justifyContent: "center",
-                backgroundColor: "red",
-              }}
-            />
-          );
+          return null;
+          // return (
+          //   <View
+          //     style={{
+          //       flex: 1,
+          //       justifyContent: "center",
+          //       backgroundColor: "red",
+          //     }}
+          //   >
+          //     <Text>Event is something else {event}</Text>
+          //   </View>
+          // );
         }
     }
   }
 
   return (
-    <View style={styles.container}>
+    <View style={{ flex: 1 }}>
       <StatusBar style="auto" />
-      {renderViewForEvent(event)}
+      {event ? renderViewForEvent(event) : <NullEventView />}
     </View>
   );
 }
@@ -238,9 +248,5 @@ const styles = StyleSheet.create({
     height: 100,
     flexDirection: "row",
     justifyContent: "space-between",
-  },
-  container: {
-    height: 100,
-    justifyContent: "center",
   },
 });

@@ -22,6 +22,8 @@
         <item name="android:backgroundDimEnabled">true</item>
     </style>
     <style name="Backpack.BottomSheetDialog" parent="Theme.AppCompat.DayNight.Dialog">
+<!--        <item name="android:windowEnterTransition">@slide</item>-->
+<!--        <item name="android:windowExitTransition">slide</item>-->
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:windowMinWidthMinor">100%</item>
