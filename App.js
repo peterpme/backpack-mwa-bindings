@@ -220,17 +220,6 @@ export default function App() {
           return <NullEventView />;
         } else {
           return null;
-          // return (
-          //   <View
-          //     style={{
-          //       flex: 1,
-          //       justifyContent: "center",
-          //       backgroundColor: "red",
-          //     }}
-          //   >
-          //     <Text>Event is something else {event}</Text>
-          //   </View>
-          // );
         }
     }
   }
